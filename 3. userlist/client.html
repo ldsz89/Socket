@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<!-- Created by Professor Wergeles for CS4830 at the University of Missouri -->
+<html>
+
+  <head>
+    <title>Web Sockets</title>
+    <meta charset="utf-8">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script>
+      $(function() {
+        var socket = io();
+        var you = "noname";
+
+        $("#username").keyup(function(e) {
+          if (e.keyCode == 13) {
+            // Hide the text field
+            $(this).hide();
+
+            // Remember the user
+            you = $(this).val();
+
+            // Add the user to the list
+            addToList(you);
+
+            // Tell the server that user joined
+            socket.emit("join", you);
+          }
+        });
+
+        function addToList(user) {
+          var li = $("<li>");
+          li.html(user);
+          if (user == you) {
+            li.css("color", "cornflowerblue");
+          }
+          $("#users").append(li);
+        }
+
+        socket.on("updateClient", function(clients) {
+          console.dir(clients);
+
+          // Empty the list and add users
+          $("#users").empty();
+          for(var user in clients) {
+            addToList(clients[user]);
+          }
+        });
+
+      });
+    </script>
+  </head>
+
+  <body>
+    <h1>Connection Client</h1>
+    <input id="username" type="text">
+    <ul id="users"></ul>
+  </body>
+
+</html>

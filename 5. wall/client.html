@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<!-- Created by Professor Wergeles for CS4830 at the University of Missouri -->
+<html>
+	<head>
+		<title>Web Sockets</title>
+        <meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body {
+				text-align: center;
+			}
+            #mainMenu {
+				margin-top: 150px;
+			}
+            #start {
+                display: none;
+            }
+			#game {
+				display: none;
+				border: 1px solid #333;
+            }
+		</style>
+		<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+		<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+		<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js"></script>
+		<script>
+            
+			$(function() {
+				$("#play").click(play);
+              
+                $("#name").keyup(function(e) {
+                    if (e.keyCode == 13) {
+                        play();
+                    }
+                });
+                
+                function play() {
+					$("#mainMenu").fadeOut(function(){
+						$("#game").fadeIn();
+						
+						joinGame();
+					});
+				}
+			});
+			
+			function joinGame() {
+                var on = false;
+                
+                var player = {
+					name: $("#name").val(),
+					color: $("#color").val(),
+                    score: 0
+				};
+                var baddies = [];
+				
+				var socket = io();
+				
+				socket.emit("join", player);
+                
+                var isHost = false;
+
+                socket.on("isHost", function() {
+                    isHost = true;
+                    
+                    $("#start")
+                        .show()
+                        .click(function() {
+                            $(this).hide();
+                            setupGame();
+                        });
+                });
+                
+                socket.on("updatePlayers", function(players) {
+                    $("#scoreboard > ul").empty();
+                    
+                    var teamScore = 0;
+                    
+                    for (var i in players) {
+                        var player = players[i];
+                        teamScore += player.score;
+                        
+                        var li = $("<li>");
+                        li
+                            .html(player.name + ": " + player.score)
+                            .css("color", player.color);
+                        $("#scoreboard > ul").append(li);
+                    }
+                    
+                    $("#teamScore").html("Team Score: " + teamScore);
+                });
+                
+                
+                function setupGame() {
+                    for (var i = 0; i < 4; i++) {
+                        baddies.push(new Baddie());
+                    }
+                    
+                    
+                    setInterval(function() {
+                        var dice = random(2);
+                        if (dice == 0 && on) {
+                            for (var i = 0; i < range(4, 10); i++) {
+                                baddies.push(new Baddie());
+                            }
+                            
+                            socket.emit("updateBaddies", baddies);
+                        }
+                    }, 2000);
+                    
+                    
+                    socket.emit("setupGame", {
+                        health: 20,
+                        baddies: baddies
+                    });
+                }
+                socket.on("startGame", function(state) {
+                    on = true;
+                    
+                    $("#health").html("Health: " + state.health);
+                    
+                    baddies = state.baddies;
+                    
+                    var canvas = document.getElementById("game");
+				    var c = canvas.getContext("2d");
+                    
+                    window.requestAnimationFrame(frame);
+                    
+                    function frame() {
+                        window.requestAnimationFrame(frame);
+                        
+                        if (isHost && on) { 
+                            update();
+                        }
+                        
+                        draw(canvas, c);
+                    }
+                });
+                
+                socket.on("updateBaddies", function(b) {
+                    baddies = b;
+                });
+                
+                function update() {
+                    for (var i in baddies) {
+                        baddies[i].x -= baddies[i].speed;
+                        
+                        if (baddies[i].x < 0) {
+                            socket.emit("damageBase");
+                            baddies.splice(i, 1);
+                            socket.emit("updateBaddies", baddies);
+                        }
+                        
+                    }
+                    socket.emit("updateBaddies", baddies);
+                }
+                
+                function draw(canvas, c) {
+                    canvas.width = canvas.width;
+                    
+                    for (var i in baddies) {
+                        var baddie = baddies[i];
+                        
+                        c.fillStyle = baddie.color;
+                        c.fillRect(baddie.x, baddie.y, baddie.width, baddie.height);
+                    }
+                }
+                
+				function range(lower, upper) {
+                    return random(upper) + lower;
+                }
+                function random(upper) {
+                    return Math.round(Math.random()*upper);
+                }
+                function getRandom(list) {
+                    return list[Math.floor(Math.random() * list.length)];
+                }
+                
+                function Baddie() {
+                    this.x = (function(){
+                        return $("#game").width() - range(10, 60);
+                    }());
+                    this.y = (function(){
+                        return range(0, $("#game").height() - 60);
+                    }());
+                    this.width = 50;
+                    this.height = 50;
+                    this.health = 3;
+                    this.speed = 1;
+                    this.color = (function(){
+                        var colors = ["green", "blue", "cornflowerblue", "lightgreen", "pink", "purple", "coral", "brown", "tan"];
+                        return getRandom(colors);
+                    }());
+                }
+                
+                $("#game").click(function(e) {
+                    
+                    for (var i in baddies) {
+                        var baddie = baddies[i];
+                        if ((e.offsetX >= baddie.x && e.offsetX <= baddie.x + baddie.width) && (e.offsetY >= baddie.y && e.offsetY <= baddie.y + baddie.height)) {
+                            
+                            baddies[i].health -= 1;
+                            if (baddies[i].health == 2) {
+                                baddies[i].color = "orange";
+                            }
+                            else if (baddies[i].health == 1) {
+                                baddies[i].color = "red";
+                            }
+                            else if (baddies[i].health == 0) {
+                                baddies.splice(i, 1);
+                                socket.emit("score");
+                            }
+                            socket.emit("updateBaddies", baddies);
+                            
+                        }
+                    }
+                });
+                
+                socket.on("baseDamaged", function(health) {
+                    if (health == 0) {
+                        on = false;
+                        alert("We didn't make it :(");
+                    }
+                    $("#health").html("Health: " + health);
+                });
+                
+			};
+		</script>
+	</head>
+	<body>
+		<div id="mainMenu">
+			<h1>Web Socket Game - Wall</h1>
+			<input type="text" id="name" autocomplete="off" autofocus>
+			<input type="color" id="color">
+			<button type="button" id="play" class="btn btn-success">Play</button>
+		</div>
+        <button type="button" id="start" class="btn btn-primary">Start</button>
+        <div id="scoreboard">
+            <ul></ul>
+            <div id="teamScore"></div>
+            <div id="health"></div>
+        </div>
+		<canvas id="game" width="800" height="500"></canvas>
+	</body>
+</html>

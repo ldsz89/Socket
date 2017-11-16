@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<!-- Created by Professor Wergeles for CS4830 at the University of Missouri -->
+<html>
+
+	<head>
+		<title>WebSocket Chat</title>
+		<meta charset="utf-8">
+		<script src="https://cdn.socket.io/socket.io-1.3.7.js"></script>
+		<script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+		<script>
+			$(function() {
+				$("form").submit(function(e) {
+					// Prevent form from submitting
+					e.preventDefault();
+
+					// getting the message
+					var msg = $("#message").val();
+
+					// post the message to the <ul>
+					displayMessage(msg);
+					
+					// clear the old
+					$("#message").val("");
+				});
+
+				function displayMessage(msg) {
+					// creating the list item
+					var $li = $("<li>");
+
+					// attach message to the list item
+					$li.html(msg);
+
+					// post the message to the DOM
+					$("#messages").prepend($li);
+				}
+			});
+		</script>
+	</head>
+
+	<body>
+		<form>
+			<input type="text" id="message" autocomplete="off" autofocus><button>Send</button>
+		</form>
+		<ul id="messages"></ul>
+	</body>
+
+</html>
